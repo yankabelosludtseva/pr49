@@ -1,111 +1,106 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using pr_49.Context;
+using pr_49.Model;
+using System;
+using System.Linq;
 
 namespace pr_49.Controllers
 {
-    public class UsersControllers
+    /// <summary>
+    /// Контроллер для работы с авторизацией
+    /// </summary>
+    [Route("api/AuthController")]
+    [ApiExplorerSettings(GroupName = "v1")]
+    public class AuthController : Controller
     {
-        /// <summary>
-        /// Контроллер для работы с аутентификацией пользователей
-        /// </summary>
-        [Route("api/auth")]
-        [ApiExplorerSettings(GroupName = "v1")]
-        public class AuthController : Controller
+        private readonly UserContext _context;
+
+        public AuthController()
         {
-            private readonly UserContext _context;
+            _context = new UserContext();
+        }
 
-            public AuthController()
+        /// <summary>
+        /// Регистрация пользователя
+        /// </summary>
+        /// <remarks>Данный метод регистрирует нового пользователя</remarks>
+        /// <response code="201">Регистрация успешна</response>
+        /// <response code="400">Проблемы при регистрации</response>
+        /// <response code="500">При выполнении запроса возникли ошибки</response>
+        [HttpPost("register")]
+        public IActionResult Register([FromBody] RegisterRequest request)
+        {
+            try
             {
-                _context = new UserContext();
+                // Проверяем, существует ли пользователь
+                var existingUser = _context.Users.FirstOrDefault(u => u.Login == request.Login);
+                if (existingUser != null)
+                {
+                    return BadRequest(new { message = "Пользователь уже существует" });
+                }
+
+                var user = new User
+                {
+                    Email = request.Email,
+                    Password = request.Password,
+                    Login = request.Login,
+
+                };
+
+                _context.Users.Add(user);
+                _context.SaveChanges();
+
+                return Ok(new { message = "Регистрация успешна" });
             }
-
-            /// <summary>
-            /// Регистрация нового пользователя
-            /// </summary>
-            /// <remarks>Создает учетную запись пользователя в системе</remarks>
-            /// <param name="registerModel">Данные для регистрации</param>
-            /// <response code="201">Пользователь успешно зарегистрирован</response>
-            /// <response code="400">Ошибка валидации данных</response>
-            /// <response code="500">Внутренняя ошибка сервера</response>
-            [HttpPost("register")]
-            [ProducesResponseType(201)]
-            [ProducesResponseType(400)]
-            [ProducesResponseType(500)]
-            public ActionResult Register([FromBody] RegisterModel registerModel)
+            catch (Exception)
             {
-                try
-                {
-                    if (string.IsNullOrWhiteSpace(registerModel.Username) ||
-                        string.IsNullOrWhiteSpace(registerModel.Email) ||
-                        string.IsNullOrWhiteSpace(registerModel.Password))
-                    {
-                        return BadRequest("Все поля обязательны для заполнения");
-                    }
-
-                    if (_context.Users.Any(u => u.Email == registerModel.Email))
-                    {
-                        return BadRequest("Пользователь с таким email уже существует");
-                    }
-
-                    var newUser = new User
-                    {
-                        Username = registerModel.Username,
-                        Email = registerModel.Email,
-                        Password = registerModel.Password,
-                    };
-
-                    _context.Users.Add(newUser);
-                    _context.SaveChanges();
-
-                    return StatusCode(201, new
-                    {
-                        id = newUser.Id,
-                        message = "User registered successfully"
-                    });
-                }
-                catch (Exception)
-                {
-                    return StatusCode(500);
-                }
-            }
-
-            /// <summary>
-            /// Авторизация пользователя
-            /// </summary>
-            /// <remarks>Возвращает токен доступа (хэшированный ID пользователя)</remarks>
-            /// <param name="loginModel">Данные для входа</param>
-            /// <response code="200">Успешная авторизация</response>
-            /// <response code="401">Неверные учетные данные</response>
-            /// <response code="500">Внутренняя ошибка сервера</response>
-            [HttpPost("login")]
-            [ProducesResponseType(200)]
-            [ProducesResponseType(401)]
-            [ProducesResponseType(500)]
-            public ActionResult Login([FromBody] LoginModel loginModel)
-            {
-                try
-                {
-                    var user = _context.Users
-                        .FirstOrDefault(u => u.Email == loginModel.Email && u.Password == loginModel.Password);
-
-                    if (user == null)
-                    {
-                        return Unauthorized();
-                    }
-
-                    var token = TokenHelper.GenerateToken(user.Id);
-
-                    return Ok(new
-                    {
-                        user_id = user.Id,
-                        token = token,
-                        expires_in = 3600
-                    });
-                }
-                catch (Exception)
-                {
-                    return StatusCode(500);
-                }
+                return StatusCode(500);
             }
         }
+
+        /// <summary>
+        /// Авторизация пользователя
+        /// </summary>
+        /// <remarks>Данный метод выполняет вход пользователя</remarks>
+        /// <response code="200">Авторизация успешна</response>
+        /// <response code="400">Неверный логин или пароль</response>
+        /// <response code="500">При выполнении запроса возникли ошибки</response>
+        [HttpPost("login")]
+        public IActionResult Login([FromBody] LoginRequest request)
+        {
+            try
+            {
+                // Ищем пользователя
+                var user = _context.Users.FirstOrDefault(u => u.Email == request.Email && u.Password == request.Password);
+
+                if (user == null)
+                {
+                    return Unauthorized(new { message = "Неверный логин или пароль" });
+                }
+
+                // Токен = Id пользователя
+                string token = user.Id.ToString();
+
+                return Ok(new { token = token });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500);
+            }
+        }
+    }
+
+    // Классы для запросов
+    public class RegisterRequest
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
+        public string Login { get; set; }
+    }
+
+    public class LoginRequest
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
     }
 }

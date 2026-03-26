@@ -4,10 +4,7 @@
     {
         public int Id { get; set; }
         public int UserId { get; set; }
-        public int MenuId { get; set; }
-        public string DishesJson { get; set; }
-        public decimal TotalPrice { get; set; }
-        public string Status { get; set; }
-        public string CreatedAt { get; set; }
+        public string Address { get; set; }
+        public string DeliveryDate { get; set; }
     }
 }

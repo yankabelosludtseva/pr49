@@ -6,6 +6,7 @@ namespace pr_49.Context
     public class OrderContext : DbContext
     {
         public DbSet<Order> Orders { get; set; }
+        public DbSet<OrderDish> OrderDishes { get; set; }
 
         public OrderContext()
         {
@@ -19,5 +20,20 @@ namespace pr_49.Context
                                   "pwd=;" +
                                   "database=FoodAPI",
                 new MySqlServerVersion(new Version(8, 0, 11)));
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<OrderDish>()
+                .HasOne(od => od.Order)
+                .WithMany(o => o.OrderDishes)
+                .HasForeignKey(od => od.OrderId);
+
+            modelBuilder.Entity<OrderDish>()
+                .HasOne(od => od.Dish)
+                .WithMany()
+                .HasForeignKey(od => od.DishId);
+        }
     }
 }
